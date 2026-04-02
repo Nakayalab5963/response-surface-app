@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <title>応答曲面モバイル評価アプリ</title>
+  <style>
+    :root{
+      --bg1:#081120; --bg2:#0f172a; --panel:rgba(15,23,42,.88); --panel2:rgba(30,41,59,.92);
+      --text:#e8eef9; --muted:#9fb0cc; --line:rgba(148,163,184,.18);
+      --accent:#3b82f6; --accent2:#7dd3fc; --ok:#22c55e; --warn:#f59e0b; --err:#ef4444;
+      --shadow:0 20px 40px rgba(0,0,0,.28);
+    }
+    *{box-sizing:border-box}
+    body{margin:0;color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Hiragino Sans","Noto Sans JP",sans-serif;background:radial-gradient(circle at top left, rgba(59,130,246,.18), transparent 25%),radial-gradient(circle at top right, rgba(125,211,252,.12), transparent 25%),linear-gradient(180deg,var(--bg1),var(--bg2));min-height:100vh}
+    .wrap{max-width:860px;margin:0 auto;padding:14px 14px 34px}
+    .hero,.card{background:var(--panel);border:1px solid var(--line);border-radius:24px;box-shadow:var(--shadow);backdrop-filter:blur(10px)}
+    .hero{padding:18px;margin-bottom:14px}
+    .hero h1{margin:0 0 8px;font-size:clamp(24px,6vw,34px)}
+    .hero p,.meta{margin:0;color:var(--muted);line-height:1.65;font-size:13px}
+    .card{padding:16px;margin-bottom:14px}
+    .ttl{font-size:17px;font-weight:800;margin:0 0 12px;display:flex;gap:10px;align-items:center}
+    .dot{width:10px;height:10px;border-radius:50%;background:linear-gradient(135deg,var(--accent),var(--accent2));box-shadow:0 0 0 6px rgba(59,130,246,.12)}
+    .field,.subcard{background:var(--panel2);border:1px solid var(--line);border-radius:18px;padding:12px}
+    .field{margin-bottom:12px}
+    .field label{display:flex;justify-content:space-between;gap:12px;margin-bottom:8px;font-size:14px;font-weight:700}
+    .valueTag{font-size:12px;color:var(--accent2);font-variant-numeric:tabular-nums}
+    .numrow,.btns,.proposal-grid{display:grid;gap:8px}
+    .numrow{grid-template-columns:1fr 1fr 1fr;margin-top:8px}
+    .btns{grid-template-columns:1fr 1fr}
+    .proposal-grid{grid-template-columns:1fr 1fr}
+    .mini,button,select{width:100%;border-radius:14px;padding:11px 12px;border:1px solid var(--line);background:rgba(8,15,30,.72);color:var(--text);font-size:14px}
+    input[type=range]{width:100%;accent-color:var(--accent)}
+    .primary{background:linear-gradient(135deg,var(--accent),#2563eb);border:none;font-weight:800}
+    .secondary{font-weight:700}
+    .upload{display:block;text-align:center;padding:13px 14px;border-radius:16px;background:linear-gradient(135deg,#16a34a,#10b981);font-weight:800;cursor:pointer}
+    #csvFile{display:none}
+    .resultBox{background:linear-gradient(135deg, rgba(59,130,246,.18), rgba(37,99,235,.24));border:1px solid rgba(59,130,246,.26);border-radius:20px;padding:16px}
+    .caption{font-size:13px;color:var(--muted);margin-bottom:6px}
+    .big{font-size:clamp(30px,9vw,42px);font-weight:900;line-height:1.05;font-variant-numeric:tabular-nums}
+    .status{border-radius:16px;padding:12px 14px;font-size:13px;line-height:1.6;margin-top:10px}
+    .ok{background:rgba(34,197,94,.12);border:1px solid rgba(34,197,94,.24)}
+    .warn{background:rgba(245,158,11,.12);border:1px solid rgba(245,158,11,.24)}
+    .err{background:rgba(239,68,68,.12);border:1px solid rgba(239,68,68,.24)}
+    .chips{margin-top:10px}
+    .chip{display:inline-block;padding:6px 10px;border-radius:999px;border:1px solid var(--line);color:var(--muted);font-size:12px;margin:4px 6px 0 0}
+    .foot{text-align:center;color:var(--muted);font-size:12px;line-height:1.7;padding:4px 10px 20px}
+    .tablewrap{overflow:auto;border:1px solid var(--line);border-radius:16px;background:rgba(8,15,30,.55);margin-top:10px}
+    table{width:100%;border-collapse:collapse;font-size:13px}
+    th,td{padding:10px 8px;border-bottom:1px solid var(--line);text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+    th:first-child,td:first-child{text-align:center}
+    th{position:sticky;top:0;background:rgba(15,23,42,.98)}
+    .row-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+    .small{font-size:12px}
+    .mono{font-variant-numeric:tabular-nums}
+    @media (max-width:720px){.proposal-grid,.btns{grid-template-columns:1fr}th,td{padding:9px 6px;font-size:12px}}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <section class="hero">
+      <h1>応答曲面モバイル評価アプリ</h1>
+      <p>設計変数から目的関数を即時計算し、さらに目的関数の範囲を指定すると、その条件を満たす設計変数候補を提案します。<br><strong>index.html</strong> と <strong>Adaptive_lower_room_GP_2020s.csv</strong> を同じ場所に置けば、自動読込でそのまま使えます。</p>
+    </section>
+
+    <section class="card">
+      <h2 class="ttl"><span class="dot"></span>読み込み</h2>
+      <div class="meta">公開サーバー上では同じフォルダに置いた <strong>Adaptive_lower_room_GP_2020s.csv</strong> を自動読込します。ローカル確認時は手動アップロードもできます。</div>
+      <label class="upload" for="csvFile">CSVを読み込む</label>
+      <input id="csvFile" type="file" accept=".csv,text/csv" />
+      <div id="fileInfo" class="meta" style="margin-top:10px">未読込</div>
+      <div class="chips"><span class="chip">Roof</span><span class="chip">SHGC</span><span class="chip">U_window</span><span class="chip">Wall</span><span class="chip">Adaptive_lower_room</span></div>
+    </section>
+
+    <section class="card">
+      <h2 class="ttl"><span class="dot"></span>設計変数 → 目的関数</h2>
+      <div id="fields"></div>
+      <div class="btns">
+        <button class="secondary" id="resetBtn">中央値に戻す</button>
+        <button class="primary" id="sampleBtn">サンプル値を入れる</button>
+      </div>
+      <div class="resultBox" style="margin-top:12px">
+        <div class="caption">Adaptive_lower_room</div>
+        <div id="result" class="big">—</div>
+      </div>
+      <div id="status" class="status warn">CSVを読み込むと計算できます。</div>
+      <div id="detail" class="meta" style="margin-top:10px"></div>
+    </section>
+
+    <section class="card">
+      <h2 class="ttl"><span class="dot"></span>目的関数範囲 → 設計変数候補</h2>
+      <div class="proposal-grid">
+        <div class="subcard">
+          <label class="small">目的関数の下限</label>
+          <input id="yMin" class="mini mono" type="number" step="any" placeholder="例: 0.45">
+        </div>
+        <div class="subcard">
+          <label class="small">目的関数の上限</label>
+          <input id="yMax" class="mini mono" type="number" step="any" placeholder="例: 0.50">
+        </div>
+        <div class="subcard">
+          <label class="small">探索サンプル数</label>
+          <input id="nSamples" class="mini mono" type="number" step="1" value="30000">
+        </div>
+        <div class="subcard">
+          <label class="small">提案件数</label>
+          <input id="topN" class="mini mono" type="number" step="1" value="10">
+        </div>
+      </div>
+
+      <div class="row-actions">
+        <button class="primary" id="proposalBtn">候補を提案する</button>
+        <button class="secondary" id="downloadCsvBtn">候補CSVを保存</button>
+      </div>
+
+      <div id="proposalStatus" class="status warn">目的関数範囲を入力すると、条件を満たす設計変数候補を提案します。</div>
+      <div id="proposalMeta" class="meta" style="margin-top:10px"></div>
+
+      <div class="tablewrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Rank</th>
+              <th>Roof</th>
+              <th>SHGC</th>
+              <th>U_window</th>
+              <th>Wall</th>
+              <th>Adaptive_lower_room</th>
+              <th>中心との差</th>
+            </tr>
+          </thead>
+          <tbody id="proposalTableBody">
+            <tr><td colspan="7" style="text-align:center;color:var(--muted)">まだ候補はありません</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <div class="foot">GitHub Pages / Netlify / Vercel にそのまま配置できます。</div>
+  </div>
+
+<script>
+const state = { names:["Roof","SHGC","U_window","Wall"], values:[0,0,0,0], model:null, proposalResults:[] };
+
+function parseCsv(text){
+  const rows=text.split(/\r?\n/).map(r=>r.split(",").map(v=>v.trim())).filter(r=>!(r.length===1&&r[0]==="")&&r.some(v=>v!==""));
+  let idx=0; idx+=2;
+  const x_range=[]; for(let i=0;i<4;i++){ x_range.push(rows[idx].filter(v=>v!=="").map(Number).slice(0,2)); idx++; }
+  idx+=1;
+  const y_range=[]; for(let i=0;i<2;i++){ y_range.push(Number(rows[idx].filter(v=>v!=="")[0])); idx++; }
+  idx+=1;
+  const x_data=[]; for(let i=0;i<162;i++){ x_data.push(rows[idx].filter(v=>v!=="").map(Number).slice(0,4)); idx++; }
+  idx+=1;
+  const alpha=[]; for(let i=0;i<162;i++){ alpha.push(Number(rows[idx].filter(v=>v!=="")[0])); idx++; }
+  idx+=1;
+  const mean_value=Number(rows[idx].filter(v=>v!=="")[0]); idx+=2;
+  const signal_variance=Number(rows[idx].filter(v=>v!=="")[0]); idx+=2;
+  const length_scale=[]; for(let i=0;i<4;i++){ length_scale.push(Number(rows[idx].filter(v=>v!=="")[0])); idx++; }
+  return {x_range,y_range,x_data,alpha,mean_value,signal_variance,length_scale};
+}
+function midpoint(a,b){ return (Number(a)+Number(b))/2; }
+function getDistance(xp,xq,ls){ let res=0; for(let i=0;i<xp.length;i++){ const d=(xp[i]-xq[i])/ls[i]; res+=d*d; } return res; }
+function covariance(distance,sv){ const t2=5.0*distance; const t=Math.sqrt(t2); return sv*(1.0+t+t2/3.0)*Math.exp(-t); }
+function evaluateModel(x){
+  const m=state.model;
+  const xn=x.map((v,i)=>(v-m.x_range[i][0])/(m.x_range[i][1]-m.x_range[i][0]));
+  let yn=m.mean_value;
+  for(let i=0;i<m.alpha.length;i++){ yn += m.alpha[i] * covariance(getDistance(xn,m.x_data[i],m.length_scale), m.signal_variance); }
+  return m.y_range[0] + (m.y_range[1]-m.y_range[0]) * yn;
+}
+function fmt(v,d=6){ return Number(v).toFixed(d); }
+function clamp(){
+  if(!state.model) return;
+  state.values = state.values.map((v,i)=>{ const [mn,mx]=state.model.x_range[i]; return Math.min(mx, Math.max(mn, v)); });
+}
+function buildFields(){
+  const root=document.getElementById('fields'); root.innerHTML='';
+  state.names.forEach((name,i)=>{
+    const box=document.createElement('div');
+    box.className='field';
+    box.innerHTML=`<label><span>${name}</span><span class="valueTag" id="tag-${i}">未設定</span></label>
+      <input id="range-${i}" type="range" step="any" disabled>
+      <div class="numrow">
+        <input id="min-${i}" class="mini" type="number" readonly>
+        <input id="num-${i}" class="mini" type="number" step="any" disabled>
+        <input id="max-${i}" class="mini" type="number" readonly>
+      </div>`;
+    root.appendChild(box);
+  });
+  state.names.forEach((_,i)=>{
+    document.getElementById(`range-${i}`).addEventListener('input',e=>{ state.values[i]=Number(e.target.value); refresh(); });
+    document.getElementById(`num-${i}`).addEventListener('change',e=>{ state.values[i]=Number(e.target.value); refresh(); });
+  });
+}
+function syncFields(){
+  state.names.forEach((_,i)=>{
+    const r=document.getElementById(`range-${i}`), n=document.getElementById(`num-${i}`), mnbox=document.getElementById(`min-${i}`), mxbox=document.getElementById(`max-${i}`), tag=document.getElementById(`tag-${i}`);
+    if(!state.model){ r.disabled=true; n.disabled=true; tag.textContent='未設定'; mnbox.value=''; mxbox.value=''; n.value=''; return; }
+    const [mn,mx]=state.model.x_range[i];
+    r.disabled=false; n.disabled=false; r.min=mn; r.max=mx; r.value=state.values[i]; n.min=mn; n.max=mx; n.value=state.values[i];
+    mnbox.value=fmt(mn,4); mxbox.value=fmt(mx,4); tag.textContent=fmt(state.values[i],6);
+  });
+}
+function refresh(){
+  const status=document.getElementById('status'), result=document.getElementById('result'), detail=document.getElementById('detail');
+  clamp(); syncFields();
+  if(!state.model){ result.textContent='—'; status.className='status warn'; status.textContent='CSVを読み込むと計算できます。'; detail.textContent=''; return; }
+  const y=evaluateModel(state.values);
+  result.textContent=fmt(y,8);
+  status.className='status ok';
+  status.textContent='計算完了。設計変数を変更すると即時計算されます。';
+  detail.innerHTML=`Roof = <strong>${fmt(state.values[0],6)}</strong> / SHGC = <strong>${fmt(state.values[1],6)}</strong> / U_window = <strong>${fmt(state.values[2],6)}</strong> / Wall = <strong>${fmt(state.values[3],6)}</strong>`;
+}
+function loadModel(text,label){
+  try{
+    state.model=parseCsv(text);
+    state.values=state.model.x_range.map(([a,b])=>midpoint(a,b));
+    document.getElementById('fileInfo').innerHTML=`読込済み: <strong>${label}</strong><br>学習点数: 162 / ブラウザ内で即時計算`;
+    document.getElementById('yMin').placeholder = `例: ${fmt(state.model.y_range[0],4)}`;
+    document.getElementById('yMax').placeholder = `例: ${fmt(state.model.y_range[1],4)}`;
+    refresh();
+  }catch(err){
+    console.error(err);
+    const status=document.getElementById('status');
+    status.className='status err';
+    status.textContent='CSVの形式を解釈できませんでした。Adaptive_lower_room_GP_2020s.csv を使用してください。';
+  }
+}
+function randUniform(min,max){ return min + Math.random()*(max-min); }
+function proposeCandidates(yMin,yMax,nSamples,topN){
+  const center=0.5*(yMin+yMax), hits=[];
+  for(let k=0;k<nSamples;k++){
+    const x=state.model.x_range.map(([mn,mx])=>randUniform(mn,mx));
+    const y=evaluateModel(x);
+    if(y>=yMin && y<=yMax){
+      hits.push({Roof:x[0],SHGC:x[1],U_window:x[2],Wall:x[3],Adaptive_lower_room:y,score:Math.abs(y-center)});
+    }
+  }
+  hits.sort((a,b)=>a.score-b.score);
+  return hits.slice(0,topN);
+}
+function renderProposalTable(rows){
+  const body=document.getElementById('proposalTableBody');
+  if(!rows.length){ body.innerHTML='<tr><td colspan="7" style="text-align:center;color:var(--muted)">条件を満たす候補が見つかりませんでした</td></tr>'; return; }
+  body.innerHTML=rows.map((r,idx)=>`<tr><td>${idx+1}</td><td>${fmt(r.Roof,6)}</td><td>${fmt(r.SHGC,6)}</td><td>${fmt(r.U_window,6)}</td><td>${fmt(r.Wall,6)}</td><td>${fmt(r.Adaptive_lower_room,6)}</td><td>${fmt(r.score,6)}</td></tr>`).join('');
+}
+function downloadProposalCsv(){
+  if(!state.proposalResults.length) return;
+  const header=['Rank','Roof','SHGC','U_window','Wall','Adaptive_lower_room','score'];
+  const lines=[header.join(',')];
+  state.proposalResults.forEach((r,idx)=>{ lines.push([idx+1,r.Roof,r.SHGC,r.U_window,r.Wall,r.Adaptive_lower_room,r.score].join(',')); });
+  const blob=new Blob([lines.join('\n')], {type:'text/csv;charset=utf-8;'});
+  const a=document.createElement('a');
+  const url=URL.createObjectURL(blob);
+  a.href=url; a.download='design_candidates_topN.csv'; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+}
+document.getElementById('csvFile').addEventListener('change', async (e)=>{ const f=e.target.files?.[0]; if(!f) return; loadModel(await f.text(), f.name); });
+document.getElementById('resetBtn').addEventListener('click',()=>{ if(!state.model) return; state.values=state.model.x_range.map(([a,b])=>midpoint(a,b)); refresh(); });
+document.getElementById('sampleBtn').addEventListener('click',()=>{ if(!state.model) return; const weights=[0.8,0.25,0.55,0.65]; state.values=state.model.x_range.map(([mn,mx],i)=>mn+(mx-mn)*weights[i]); refresh(); });
+document.getElementById('proposalBtn').addEventListener('click',()=>{
+  const status=document.getElementById('proposalStatus'), meta=document.getElementById('proposalMeta');
+  if(!state.model){ status.className='status warn'; status.textContent='先にCSVを読み込んでください。'; return; }
+  const yMin=Number(document.getElementById('yMin').value), yMax=Number(document.getElementById('yMax').value);
+  const nSamples=Math.max(1000, Math.floor(Number(document.getElementById('nSamples').value)||30000));
+  const topN=Math.max(1, Math.floor(Number(document.getElementById('topN').value)||10));
+  if(!Number.isFinite(yMin)||!Number.isFinite(yMax)||yMin>yMax){ status.className='status err'; status.textContent='目的関数の下限・上限を正しく入力してください。'; return; }
+  status.className='status warn'; status.textContent='探索中です…';
+  setTimeout(()=>{
+    const rows=proposeCandidates(yMin,yMax,nSamples,topN);
+    state.proposalResults=rows; renderProposalTable(rows);
+    if(rows.length){
+      status.className='status ok';
+      status.textContent=`${rows.length} 件の候補を提案しました。順位は目的関数範囲の中心への近さで付けています。`;
+      meta.innerHTML=`探索条件: y = <strong>${fmt(yMin,6)}</strong> ～ <strong>${fmt(yMax,6)}</strong> / サンプル数 = <strong>${nSamples}</strong> / 提案件数 = <strong>${topN}</strong>`;
+    }else{
+      status.className='status warn';
+      status.textContent='条件を満たす候補が見つかりませんでした。範囲を広げるか、探索サンプル数を増やしてください。';
+      meta.innerHTML=`探索条件: y = <strong>${fmt(yMin,6)}</strong> ～ <strong>${fmt(yMax,6)}</strong> / サンプル数 = <strong>${nSamples}</strong>`;
+    }
+  }, 30);
+});
+document.getElementById('downloadCsvBtn').addEventListener('click', downloadProposalCsv);
+
+buildFields(); refresh(); renderProposalTable([]);
+fetch('Adaptive_lower_room_GP_2020s.csv').then(r=>{ if(!r.ok) throw new Error('not found'); return r.text(); }).then(text=>loadModel(text,'Adaptive_lower_room_GP_2020s.csv')).catch(()=>{});
+const params=new URLSearchParams(location.search); const dataUrl=params.get('data');
+if(dataUrl){ fetch(dataUrl).then(r=>{ if(!r.ok) throw new Error('not found'); return r.text(); }).then(text=>loadModel(text,dataUrl)).catch(()=>{}); }
+</script>
+</body>
+</html>
